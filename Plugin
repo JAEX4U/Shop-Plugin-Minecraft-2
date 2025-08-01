@@ -1,18 +1,46 @@
-name: ShopPlugin
-version: 1.2
-main: me.yourname.shop.ShopPlugin
-api-version: 1.16
-description: A Minecraft shop plugin with buy/sell and Vault support
-author: YourName
-depend: [Vault]
+package me.yourname.shop;
 
-commands:
-  shop:
-    description: Opens the main shop menu
-    usage: /shop
-  buy:
-    description: Opens the buy-only shop
-    usage: /buy
-  sell:
-    description: Opens the sell-only shop
-    usage: /sell
+import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.RegisteredServiceProvider;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public class ShopPlugin extends JavaPlugin {
+
+    public static Economy economy;
+
+    @Override
+    public void onEnable() {
+        // Load Vault for economy
+        if (!setupEconomy()) {
+            getLogger().severe("Vault not found or no economy plugin installed!");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        // Register command executor (ShopManager handles all logic)
+        ShopManager shopManager = new ShopManager(this);
+        getCommand("shop").setExecutor(shopManager);
+        getCommand("buy").setExecutor(shopManager);
+        getCommand("sell").setExecutor(shopManager);
+
+        // Register events for GUI clicks
+        Bukkit.getPluginManager().registerEvents(shopManager, this);
+
+        getLogger().info("ShopPlugin has been enabled.");
+    }
+
+    @Override
+    public void onDisable() {
+        getLogger().info("ShopPlugin has been disabled.");
+    }
+
+    private boolean setupEconomy() {
+        RegisteredServiceProvider<Economy> rsp = getServer()
+                .getServicesManager().getRegistration(Economy.class);
+        if (rsp != null) {
+            economy = rsp.getProvider();
+        }
+        return economy != null;
+    }
+}
