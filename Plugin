@@ -1,0 +1,18 @@
+name: ShopPlugin
+version: 1.2
+main: me.yourname.shop.ShopPlugin
+api-version: 1.16
+description: A Minecraft shop plugin with buy/sell and Vault support
+author: YourName
+depend: [Vault]
+
+commands:
+  shop:
+    description: Opens the main shop menu
+    usage: /shop
+  buy:
+    description: Opens the buy-only shop
+    usage: /buy
+  sell:
+    description: Opens the sell-only shop
+    usage: /sell
