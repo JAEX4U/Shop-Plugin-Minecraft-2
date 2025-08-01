@@ -1,7 +1,140 @@
-commands:
-  shop:
-    description: Opens the main shop GUI
-  buy:
-    description: Opens the buy-only shop
-  sell:
-    description: Opens the sell-only shop
+package me.yourname.shop;
+
+import org.bukkit.*;
+import org.bukkit.command.*;
+import org.bukkit.entity.Player;
+import org.bukkit.event.*;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.*;
+import org.bukkit.plugin.Plugin;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class ShopManager implements CommandExecutor, Listener {
+
+    private final Plugin plugin;
+    private final Inventory shopInv, buyInv, sellInv;
+
+    // Stores item prices
+    private final Map<Material, Double> buyPrices = new HashMap<>();
+    private final Map<Material, Double> sellPrices = new HashMap<>();
+
+    public ShopManager(Plugin plugin) {
+        this.plugin = plugin;
+
+        shopInv = Bukkit.createInventory(null, 9, "Shop");
+        buyInv = Bukkit.createInventory(null, 9, "Buy Shop");
+        sellInv = Bukkit.createInventory(null, 9, "Sell Shop");
+
+        // Add items and prices
+        addItem(Material.DIAMOND, 100.0, 50.0);
+        addItem(Material.IRON_INGOT, 20.0, 10.0);
+    }
+
+    private void addItem(Material material, double buy, double sell) {
+        buyPrices.put(material, buy);
+        sellPrices.put(material, sell);
+
+        ItemStack item = new ItemStack(material, 1);
+        shopInv.addItem(item);
+        buyInv.addItem(item);
+        sellInv.addItem(item);
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+        if (!(sender instanceof Player player)) return false;
+
+        switch (cmd.getName().toLowerCase()) {
+            case "shop" -> player.openInventory(shopInv);
+            case "buy" -> player.openInventory(buyInv);
+            case "sell" -> player.openInventory(sellInv);
+        }
+        return true;
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player player)) return;
+
+        String title = e.getView().getTitle();
+        ItemStack clicked = e.getCurrentItem();
+
+        if (clicked == null || clicked.getType() == Material.AIR) return;
+
+        Material mat = clicked.getType();
+        e.setCancelled(true); // Prevent taking items
+
+        // /shop - opens Buy/Sell menu
+        if (title.equals("Shop")) {
+            openBuySellMenu(player, mat);
+        }
+
+        // /buy - buys directly
+        else if (title.equals("Buy Shop")) {
+            double price = buyPrices.getOrDefault(mat, 0.0);
+            if (ShopPlugin.economy.getBalance(player) >= price) {
+                ShopPlugin.economy.withdrawPlayer(player, price);
+                player.getInventory().addItem(new ItemStack(mat, 1));
+                player.sendMessage("§aYou bought 1 " + mat + " for $" + price);
+            } else {
+                player.sendMessage("§cNot enough money!");
+            }
+        }
+
+        // /sell - sells directly
+        else if (title.equals("Sell Shop")) {
+            if (player.getInventory().containsAtLeast(new ItemStack(mat), 1)) {
+                player.getInventory().removeItem(new ItemStack(mat, 1));
+                double price = sellPrices.getOrDefault(mat, 0.0);
+                ShopPlugin.economy.depositPlayer(player, price);
+                player.sendMessage("§aYou sold 1 " + mat + " for $" + price);
+            } else {
+                player.sendMessage("§cYou don't have that item to sell!");
+            }
+        }
+
+        // Clicked on Buy/Sell menu from /shop
+        else if (title.startsWith("Buy/Sell:")) {
+            if (clicked.getType() == Material.EMERALD) {
+                double price = buyPrices.getOrDefault(mat, 0.0);
+                if (ShopPlugin.economy.getBalance(player) >= price) {
+                    ShopPlugin.economy.withdrawPlayer(player, price);
+                    player.getInventory().addItem(new ItemStack(mat, 1));
+                    player.sendMessage("§aYou bought 1 " + mat + " for $" + price);
+                } else {
+                    player.sendMessage("§cNot enough money!");
+                }
+            } else if (clicked.getType() == Material.REDSTONE) {
+                if (player.getInventory().containsAtLeast(new ItemStack(mat), 1)) {
+                    player.getInventory().removeItem(new ItemStack(mat, 1));
+                    double price = sellPrices.getOrDefault(mat, 0.0);
+                    ShopPlugin.economy.depositPlayer(player, price);
+                    player.sendMessage("§aYou sold 1 " + mat + " for $" + price);
+                } else {
+                    player.sendMessage("§cYou don't have that item to sell!");
+                }
+            }
+        }
+    }
+
+    private void openBuySellMenu(Player player, Material mat) {
+        Inventory inv = Bukkit.createInventory(null, 9, "Buy/Sell: " + mat.name());
+
+        ItemStack buyItem = new ItemStack(Material.EMERALD);
+        ItemMeta buyMeta = buyItem.getItemMeta();
+        buyMeta.setDisplayName("§aBuy 1 for $" + buyPrices.get(mat));
+        buyItem.setItemMeta(buyMeta);
+
+        ItemStack sellItem = new ItemStack(Material.REDSTONE);
+        ItemMeta sellMeta = sellItem.getItemMeta();
+        sellMeta.setDisplayName("§cSell 1 for $" + sellPrices.get(mat));
+        sellItem.setItemMeta(sellMeta);
+
+        inv.setItem(3, buyItem);
+        inv.setItem(5, sellItem);
+
+        player.openInventory(inv);
+    }
+}
